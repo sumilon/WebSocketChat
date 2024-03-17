@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spring Boot WebSocket Chat</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <style>
+        body {
+            background-color: #f8f9fa;
+            padding-top: 20px;
+        }
+        #chat {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card" id="usernameDiv">
+                <div class="card-body">
+                    <div class="form-group">
+                        <label for="usernameInput">Username:</label>
+                        <input type="text" class="form-control" id="usernameInput" placeholder="Enter your username...">
+                    </div>
+                    <button class="btn btn-primary btn-block" onclick="setUsername()">Set Username</button>
+                </div>
+            </div>
+            <div class="card mt-3" style="display:none" id="messageDiv">
+                <div class="card-body">
+                    <div id="chat" class="overflow-auto"></div>
+                    <div class="form-group mt-3">
+                        <input type="text" class="form-control" id="messageInput" placeholder="Type your message...">
+                    </div>
+                    <button class="btn btn-primary btn-block" onclick="sendMessage()">Send</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.5.0/sockjs.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+
+<script>
+        const socket = new SockJS('/chat');
+        const stompClient = Stomp.over(socket);
+        let username;
+        const userColors = {};
+
+        stompClient.connect({}, function() {
+            console.log('Connected to WebSocket');
+            stompClient.subscribe('/topic/messages', function(response) {
+                const chatDiv = document.getElementById('chat');
+                const message = JSON.parse(response.body);
+                const color = getUserColor(message.username);
+                chatDiv.innerHTML += '<p style="color: ' + color + '">' + message.username + ': ' + message.text + '</p>';
+                chatDiv.scrollTop = chatDiv.scrollHeight; // Auto-scroll to bottom
+            });
+        });
+
+        function setUsername() {
+            const usernameInput = document.getElementById('usernameInput');
+            username = usernameInput.value;
+            document.getElementById('usernameDiv').style.display = 'none';
+            document.getElementById("messageDiv").style.display='block';
+        }
+
+        function sendMessage() {
+            const messageInput = document.getElementById('messageInput');
+            const message = messageInput.value;
+            stompClient.send('/app/chat', {}, JSON.stringify({ username: username, text: message }));
+            messageInput.value = ''; // Clear input field after sending
+        }
+
+        function getUserColor(username) {
+            if (!userColors[username]) {
+                // Generate a color based on the username
+                const hash = hashCode(username);
+                const color = '#' + intToRGB(hash);
+                userColors[username] = color;
+            }
+            return userColors[username];
+        }
+
+        function hashCode(str) {
+            let hash = 0;
+            for (let i = 0; i < str.length; i++) {
+                hash = str.charCodeAt(i) + ((hash << 5) - hash);
+            }
+            return hash;
+        }
+
+        function intToRGB(i) {
+            const c = (i & 0x00FFFFFF).toString(16).toUpperCase();
+            return '00000'.substring(0, 6 - c.length) + c;
+        }
+    </script>
+</body>
+</html>
